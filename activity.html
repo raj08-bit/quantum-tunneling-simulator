@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Tunneling Simulator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #00adb5; margin-bottom: 10px; }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        canvas {
+            border: 2px solid #333;
+            background-color: #050505;
+            border-radius: 5px;
+        }
+        .controls {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label { margin-bottom: 5px; font-size: 14px; color: #aaaaaa; }
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #333;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            background: #00adb5;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .info {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #888;
+            text-align: center;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Quantum Tunneling Simulator</h1>
+    
+    <div class="container">
+        <canvas id="quantumCanvas" width="700" height="350"></canvas>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label id="energyLabel">Particle Energy (E): 50</label>
+                <input type="range" id="energySlider" min="20" max="80" value="50">
+            </div>
+            <div class="control-group">
+                <label id="barrierHeightLabel">Barrier Height (V₀): 70</label>
+                <input type="range" id="barrierHeightSlider" min="55" max="120" value="70">
+            </div>
+            <div class="control-group">
+                <label id="barrierWidthLabel">Barrier Width (L): 40 px</label>
+                <input type="range" id="barrierWidthSlider" min="10" max="80" value="40">
+            </div>
+            <div class="control-group">
+                <label id="wavelengthLabel">Wavelength (λ): Moderate</label>
+                <input type="range" id="freqSlider" min="1" max="5" value = "3" step="0.1">
+            </div>
+        </div>
+
+        <div class="info">
+            <p><strong>Explanation:</strong> Cyan line represents the real part of the wave function ($\psi$). Notice how the wave's amplitude decays exponentially inside the potential barrier (grey region) but emerges on the other side with a smaller amplitude, demonstrating a non-zero transmission probability.</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('quantumCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Sliders and Labels
+        const energySlider = document.getElementById('energySlider');
+        const barrierHeightSlider = document.getElementById('barrierHeightSlider');
+        const barrierWidthSlider = document.getElementById('barrierWidthSlider');
+        const freqSlider = document.getElementById('freqSlider');
+
+        const energyLabel = document.getElementById('energyLabel');
+        const barrierHeightLabel = document.getElementById('barrierHeightLabel');
+        const barrierWidthLabel = document.getElementById('barrierWidthLabel');
+        const wavelengthLabel = document.getElementById('wavelengthLabel');
+
+        // Simulation Parameters
+        let time = 0;
+        const barrierX = canvas.width / 2; // Position barrier in the center
+
+        function animate() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Fetch live values from sliders
+            const E = parseFloat(energySlider.value);
+            const V0 = parseFloat(barrierHeightSlider.value);
+            const L = parseFloat(barrierWidthSlider.value);
+            const k1 = parseFloat(freqSlider.value) * 0.05; // Wave vector outside
+
+            // Update Labels
+            energyLabel.innerText = `Particle Energy (E): ${E}`;
+            barrierHeightLabel.innerText = `Barrier Height (V₀): ${V0}`;
+            barrierWidthLabel.innerText = `Barrier Width (L): ${L} px`;
+
+            // Draw Center Reference Ground Line
+            ctx.beginPath();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+
+            // 1. Draw Potential Barrier (Grey Rectangle)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(barrierX - L/2, (canvas.height / 2) - V0, L, V0);
+            
+            // Draw Barrier Outline
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barrierX - L/2, (canvas.height / 2) - V0, L, V0);
+
+            // 2. Draw Wave Function (ψ)
+            ctx.beginPath();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#00adb5';
+
+            let amplitude = 40; // Initial amplitude of the wave
+            
+            for (let x = 0; x < canvas.width; x++) {
+                let y = canvas.height / 2;
+
+                if (x < barrierX - L/2) {
+                    // Region I: Incident + Reflected Wave (Normal sinusoidal oscillation)
+                    y += amplitude * Math.sin(k1 * x - time);
+                } 
+                else if (x >= barrierX - L/2 && x <= barrierX + L/2) {
+                    // Region II: Inside the Barrier (Exponential decay)
+                    // k2 proportional to sqrt(V0 - E)
+                    const k2 = Math.sqrt(Math.max(0, V0 - E)) * 0.08; 
+                    const xInside = x - (barrierX - L/2);
+                    
+                    // Simple attenuation mapping
+                    const decayFactor = Math.exp(-k2 * xInside);
+                    y += amplitude * Math.sin(k1 * (barrierX - L/2) - time) * decayFactor;
+                } 
+                else {
+                    // Region III: Transmitted Wave (Oscillation resumes with lower amplitude)
+                    const k2Total = Math.sqrt(Math.max(0, V0 - E)) * 0.08;
+                    const finalDecay = Math.exp(-k2Total * L);
+                    const transmittedAmplitude = amplitude * finalDecay;
+                    
+                    y += transmittedAmplitude * Math.sin(k1 * x - time);
+                }
+
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // 3. Draw Energy Line Indicator (Red dashed line)
+            ctx.beginPath();
+            ctx.strokeStyle = '#ff2e63';
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(0, (canvas.height / 2) - E);
+            ctx.lineTo(canvas.width, (canvas.height / 2) - E);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset line dash
+
+            // Draw Energy text
+            ctx.fillStyle = '#ff2e63';
+            ctx.font = '12px sans-serif';
+            ctx.fillText("Energy (E)", 10, (canvas.height / 2) - E - 5);
+
+            // Update time for wave animation speed
+            time += 0.15;
+
+            requestAnimationFrame(animate);
+        }
+
+        // Start Animation Loop
+        animate();
+    </script>
+</body>
+</html>
